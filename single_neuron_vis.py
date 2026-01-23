@@ -8,7 +8,11 @@ def get_sdf(spikes,sigma=50,step=10):
     # gaussian kernel
     gx = np.arange(-3*sigma, 3*sigma)
     gaussian = np.exp(-(gx/sigma)**2/2)/(sigma*np.sqrt(2*np.pi))
-    sdf = convolve1d(spikes, gaussian, axis=1)*1000
+
+    if len(spikes.shape)==1:
+        sdf = convolve1d(spikes.astype(float), gaussian, axis=0) * 1000
+    else:
+        sdf = convolve1d(spikes.astype(float), gaussian, axis=1) * 1000
     
     return sdf
 

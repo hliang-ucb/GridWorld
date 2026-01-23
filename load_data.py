@@ -75,6 +75,17 @@ def load_beh_neural(animal, date, region, epoch, query):
     df.insert(0,'Session',date)
     unitNames.insert(0,'Session',date)
     unitNames.insert(0,'Animal',animal)
+
+    trial_cc = pd.DataFrame(
+    df.drop_duplicates('trial')
+      .groupby('block')
+      .cumcount()
+      .rename('trial_in_block')
+)
+
+    trial_cc['trial'] = df.trial.unique()
+
+    df = df.merge(trial_cc, on='trial')
     
     return {'spikes':spikes, 
             'beh':df, 
