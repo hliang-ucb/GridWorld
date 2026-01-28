@@ -15,6 +15,7 @@ import h5py
 from tqdm import tqdm
 from pathlib import Path 
 from datetime import datetime
+import platform
 
 import numpy as np
 import pandas as pd
@@ -25,33 +26,37 @@ from statsmodels.stats.outliers_influence import variance_inflation_factor
 from statsmodels.tools.tools import add_constant
 from sklearn.preprocessing import OneHotEncoder
 
+def which_system():
+    if platform.system()=='Darwin':
+        dir = '/Volumes/Extreme SSD'
+    else:
+        dir = 'D:'
 
+    return dir
 
 def initiate_directory(animal, date):  # region, epoch, query
+
+    dir = which_system()
 
     # wrapper to easily fetch data from one session
     
     # combine all sessions
     if animal=='London':
         
-        DATA_DIR = Path('D:/Teleworld/london/neural')
-        FIG_DIR = Path('D:/Figures/London')
+        DATA_DIR = Path(f'{dir}/Teleworld/london/neural')
 
-        
     if animal=='Bart':
-        
-        FIG_DIR = Path('D:/Figures/Bart')
-        
-        if datetime.strptime(date, "%m%d%y")<datetime.strptime('050824', "%m%d%y"):
-            DATA_DIR = Path('D:/Teleworld/bart_I/processed')
-        else:
-            DATA_DIR = Path('D:/Teleworld/bart_I/npx') 
 
-    return DATA_DIR, FIG_DIR
+        if datetime.strptime(date, "%m%d%y")<datetime.strptime('050824', "%m%d%y"):
+            DATA_DIR = Path(f'{dir}/Teleworld/bart_I/processed')
+        else:
+            DATA_DIR = Path(f'{dir}/Teleworld/bart_I/npx')
+
+    return DATA_DIR
 
 
 def load_nwbfile(animal, date):
-    DATA_DIR, _ = initiate_directory(animal, date)
+    DATA_DIR = initiate_directory(animal, date)
     os.chdir(DATA_DIR)
     
     filename = glob.glob('*%s*' % date) # sorted()
@@ -65,7 +70,7 @@ def load_beh_neural(animal, date, region, epoch, query):
 
     # wrapper to easily fetch data from one session
     
-    DATA_DIR, _ = initiate_directory(animal, date)
+    DATA_DIR = initiate_directory(animal, date)
     os.chdir(DATA_DIR)
     
     filename = glob.glob('*%s*' % date) # sorted()
@@ -96,7 +101,7 @@ def load_beh_neural(animal, date, region, epoch, query):
 def load_LFP(date):
 
     # get LFP data
-    lfpFile = h5py.File('D:/Teleworld/bart_I/raw/spikes/Bart_TeleWorld_v13_%s-spikes.mat' % date, 'r')
+    lfpFile = h5py.File(f'{dir}/Teleworld/bart_I/raw/spikes/Bart_TeleWorld_v13_%s-spikes.mat' % date, 'r')
     timestamps = np.array(lfpFile['/lfpTimeStamps']).ravel()
     lfpData = lfpFile['/lfpTable']
     
