@@ -1,12 +1,6 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# load a session
-
-
-get_ipython().run_line_magic('load_ext', 'autoreload')
-get_ipython().run_line_magic('autoreload', '2')
-
 import glob
 import os
 import pynwb
@@ -16,6 +10,7 @@ from tqdm import tqdm
 from pathlib import Path 
 from datetime import datetime
 import platform
+import LFP
 
 import numpy as np
 import pandas as pd
@@ -25,6 +20,41 @@ from statsmodels.formula.api import ols
 from statsmodels.stats.outliers_influence import variance_inflation_factor
 from statsmodels.tools.tools import add_constant
 from sklearn.preprocessing import OneHotEncoder
+
+
+try:
+    from IPython import get_ipython
+    ip = get_ipython()
+    if ip is not None:
+        ip.run_line_magic('load_ext', 'autoreload')
+        ip.run_line_magic('autoreload', '2')
+except Exception:
+    pass
+
+
+class BandpassLFP:
+    
+    def __init__(self, h5_path):
+        self.f = h5py.File(h5_path, 'r')
+        self.band = self.f['band_sig']
+        self.power = self.f['power']
+        self.phase = self.f['phase']
+
+    def get_trace(self, time, channel):
+        return self.band[time, :][:,channel].T, self.power[time, :][:,channel].T, self.phase[time, :][:,channel].T
+
+    def get_band_sig(self, time, channel):
+        return self.band[time, :][:,channel]
+
+    def get_power(self, time, channel):
+        return self.power[time, :][:,channel]
+
+    def get_phase(self, time, channel):
+        return self.phase[time, :][:,channel]
+
+    def close(self):
+        self.f.close()
+
 
 def which_system():
     if platform.system()=='Darwin':
@@ -86,7 +116,7 @@ def load_beh_neural(animal, date, region, epoch, query):
       .groupby('block')
       .cumcount()
       .rename('trial_in_block')
-)
+    )
 
     trial_cc['trial'] = df.trial.unique()
 
@@ -101,7 +131,8 @@ def load_beh_neural(animal, date, region, epoch, query):
 def load_LFP(date):
 
     # get LFP data
-    lfpFile = h5py.File(f'{dir}/Teleworld/bart_I/raw/spikes/Bart_TeleWorld_v13_%s-spikes.mat' % date, 'r')
+    # lfpFile = h5py.File(f'{dir}/Teleworld/bart_I/raw/spikes/Bart_TeleWorld_v13_%s-spikes.mat' % date, 'r')
+    lfpFile = h5py.File('D:/Teleworld/bart_I/raw/spikes/Bart_TeleWorld_v13_%s-spikes.mat' % date, 'r')
     timestamps = np.array(lfpFile['/lfpTimeStamps']).ravel()
     lfpData = lfpFile['/lfpTable']
     
@@ -178,6 +209,62 @@ def get_spike_table(nwbfile, region, epoch, query="", window_size=0, unit_params
     return spikes, df, unitNames
 
 
+
+def epoch_aligned_lfp(date,df,window):
+
+    timestamps, lfpData = load_LFP(date)
+    
+    num_ch = lfpData.shape[1]
+    aligned_lfp = np.zeros((len(df),num_ch,window[1]-window[0])).astype(np.float32)
+    
+    for ii in range(len(df)):
+
+        on = df.iloc[ii].t_on.astype(float)
+        idx = (timestamps>on+window[0]) & (timestamps<on+window[1])
+        aligned_lfp[ii,:,:] = LFP.notchfilter(lfpData[idx,:].T.astype(np.float32)) 
+    
+    return aligned_lfp
+
+
+def epoch_aligned_band(date,df,window):
+
+    # hilbert transformed bandpass filtered signal
+
+    timestamps, lfpData = load_LFP(date)
+    ds = BandpassLFP("D:/Theta/Session_%s_theta.h5" % date)
+    
+    num_ch = ds.band.shape[1]
+    aligned_signal = np.zeros((len(df),num_ch,window[1]-window[0])).astype(np.float32)
+    aligned_power = np.zeros((len(df),num_ch,window[1]-window[0])).astype(np.float32)
+    aligned_phase = np.zeros((len(df),num_ch,window[1]-window[0])).astype(np.float32)
+    
+    for ii in range(len(df)):
+
+        on = df.iloc[ii].t_on.astype(float)
+        idx = (timestamps>on+window[0]) & (timestamps<on+window[1])
+        aligned_signal[ii,:,:], aligned_power[ii,:,:], aligned_phase[ii,:,:] = ds.get_trace(idx,np.arange(num_ch))
+
+    ds.close()
+    
+    return {'band': aligned_signal, 
+            'power': aligned_power, 
+            'phase': aligned_phase}
+
+
+def epoch_aligned_wavelet(date,df,window):
+
+    timestamps, lfpData = load_LFP(date)
+    
+    num_ch = lfpData.shape[1]
+    aligned_lfp = np.zeros((len(df),num_ch,window[1]-window[0])).astype(np.float32)
+    
+    for ii in range(len(df)):
+
+        on = df.iloc[ii].t_on.astype(float)
+        idx = (timestamps>on+window[0]) & (timestamps<on+window[1])
+        aligned_lfp[ii,:,:] = LFP.notchfilter(lfpData[idx,:].T.astype(np.float32)) 
+    
+    return aligned_lfp
 
 # def load_theta(date):
 

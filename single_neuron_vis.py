@@ -45,6 +45,7 @@ def plot_sdf(data, neuronID, var, colors, ax=None):
     spikes = data['spikes']
     df = data['beh'] 
     unitNames = data['unitNames']
+    df['value'] = np.maximum(0,3-df['graph_distance'].values)
 
     idx = unitNames.unitNumber==neuronID
     df['sdf']=list(get_sdf(spikes[:,:,idx]))

@@ -13,30 +13,53 @@ def distance(node1, node2, type="tele"):
 def nodes_from_string(node_str):
     return np.array([int(node) for node in node_str.split(",")])
 
+# EH
+# def use_tele(node_list):
+    # """
+    # Check if there are consecutive occurrences of 0 and 15 in the given node list.
+
+    # Args:
+    #     node_list (list): A list of nodes.
+
+    # Returns:
+    #     bool: True if there are consecutive occurrences of 0 and 15, False otherwise.
+    # """
+    # node_list = np.array(node_list)
+    # if (0 in node_list and 15 in node_list):
+    #     where_0 = np.where(node_list == 0)[0]
+    #     where_15 = np.where(node_list == 15)[0]
+    #     consecutive_0_15 = any(abs(i - j) <= 1 for i in where_0 for j in where_15)
+    #     return consecutive_0_15
+    # else:
+    #     return False
+    
+# def append_use_tele(df):
+    # n_trials = df.shape[0]
+    # if_use_tele = np.array([use_tele(nodes_from_string(df.iloc[trial].nodes)) for trial in range(n_trials)])
+    # df["use_tele"] = if_use_tele
+    # return df
+
+
+# HL edit
 def use_tele(node_list):
-    """
-    Check if there are consecutive occurrences of 0 and 15 in the given node list.
-
-    Args:
-        node_list (list): A list of nodes.
-
-    Returns:
-        bool: True if there are consecutive occurrences of 0 and 15, False otherwise.
-    """
     node_list = np.array(node_list)
     if (0 in node_list and 15 in node_list):
         where_0 = np.where(node_list == 0)[0]
         where_15 = np.where(node_list == 15)[0]
-        consecutive_0_15 = any(abs(i - j) <= 1 for i in where_0 for j in where_15)
-        return consecutive_0_15
+        consecutive_0_15 = any((i - j) == -1 for i in where_0 for j in where_15)
+        consecutive_15_0 = any((i - j) == 1 for i in where_0 for j in where_15)
+        return consecutive_0_15, consecutive_15_0
     else:
-        return False
-    
+        return False, False
+
 def append_use_tele(df):
     n_trials = df.shape[0]
     if_use_tele = np.array([use_tele(nodes_from_string(df.iloc[trial].nodes)) for trial in range(n_trials)])
-    df["use_tele"] = if_use_tele
+    df["use_tele"] = np.any(if_use_tele,axis=1)
+    df['0to15'] = if_use_tele[:,0]
+    df['15to0'] = if_use_tele[:,1]
     return df
+
 
 def xy(node, nrows, ncols):
     """
