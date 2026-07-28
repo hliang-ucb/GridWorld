@@ -135,66 +135,16 @@ class NystromHolmqvist:
     # Public API
     # ------------------------------------------------------------------
 
-    def compute_session_threshold(self, x_list, y_list):
+
+    def fit(self, x: np.ndarray, y: np.ndarray) -> NHResult:
         """
-        Compute one adaptive threshold from velocity pooled across all trials.
-
-        Call this once before fitting individual trials so that every trial
-        is classified with the same standard, rather than a per-trial threshold
-        that is skewed by blink-heavy or saccade-sparse individual trials.
-
-        Parameters
-        ----------
-        x_list, y_list : list of np.ndarray
-            One array per trial. May contain NaNs / out-of-range values.
-
-        Returns
-        -------
-        thresh_onset, thresh_offset : float
-            Pass these into fit() for every trial, or omit them and fit()
-            will use the cached values automatically.
-        """
-        all_vel = []
-        for x, y in zip(x_list, y_list):
-            try:
-                vel = self._velocity(np.asarray(x, float), np.asarray(y, float))
-                valid = vel[~np.isnan(vel)]
-                if len(valid) > 0:
-                    all_vel.append(valid)
-            except Exception:
-                continue
-
-        if not all_vel:
-            raise ValueError("No valid velocity samples found across trials.")
-
-        pooled = np.concatenate(all_vel)
-        thresh_onset, thresh_offset = self._adaptive_threshold(pooled)
-
-        # cache so fit() picks them up automatically without explicit passing
-        self.session_thresh_onset  = thresh_onset
-        self.session_thresh_offset = thresh_offset
-        print(f'Session threshold — onset: {thresh_onset:.1f} deg/s, '
-              f'offset: {thresh_offset:.1f} deg/s  '
-              f'(pooled from {len(all_vel)} trials, '
-              f'{len(pooled):,} samples)')
-        return thresh_onset, thresh_offset
-
-    def fit(self, x: np.ndarray, y: np.ndarray,
-            thresh_onset: float = None,
-            thresh_offset: float = None) -> NHResult:
-        """
-        Detect saccades, fixations, and blinks in a continuous eye trace.
+        Detect saccades, fixations, and glissades in a continuous eye trace.
 
         Parameters
         ----------
         x, y : np.ndarray
             Eye position in degrees of visual angle. NaN = missing/blink.
             Length must match.
-        thresh_onset, thresh_offset : float, optional
-            Fixed velocity thresholds (deg/s). Priority order:
-              1. Explicitly passed values here
-              2. Cached session threshold from compute_session_threshold()
-              3. Per-trial adaptive threshold (original behaviour, fallback)
 
         Returns
         -------
@@ -206,17 +156,12 @@ class NystromHolmqvist:
         # 1. Compute velocity
         vel = self._velocity(x, y)
 
-        # 2. Threshold resolution
-        if thresh_onset is None or thresh_offset is None:
-            if hasattr(self, 'session_thresh_onset'):
-                thresh_onset  = self.session_thresh_onset
-                thresh_offset = self.session_thresh_offset
-            else:
-                thresh_onset, thresh_offset = self._adaptive_threshold(vel)
+        # 2. Iterative adaptive threshold
+        thresh_onset, thresh_offset = self._adaptive_threshold(vel)
 
-        # 3. Detect saccades via hysteresis thresholding
+        # 3. Detect saccade candidates via hysteresis thresholding
         saccades = self._detect_saccades(vel, thresh_onset, thresh_offset)
-        
+
         # 4. Detect glissades immediately after each saccade
         # saccades, glissades = self._detect_glissades(vel, saccades, thresh_offset)
 
